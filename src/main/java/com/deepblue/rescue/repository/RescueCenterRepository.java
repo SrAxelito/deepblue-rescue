@@ -1,4 +1,7 @@
-package repository;
+package com.deepblue.rescue.repository;
 
-public class RescueCenterRepository {
+import com.deepblue.rescue.domain.RescueCenter;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface RescueCenterRepository extends JpaRepository<RescueCenter, Long> {
 }

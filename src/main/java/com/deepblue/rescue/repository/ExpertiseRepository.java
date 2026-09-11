@@ -1,4 +1,7 @@
-package repository;
+package com.deepblue.rescue.repository;
 
-public class ExpertiseRepository {
+import com.deepblue.rescue.domain.Expertise;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface ExpertiseRepository extends JpaRepository<Expertise, Long> {
 }
