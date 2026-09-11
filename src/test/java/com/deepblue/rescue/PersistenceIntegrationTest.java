@@ -1,6 +1,8 @@
 package com.deepblue.rescue;
 
+import com.deepblue.rescue.domain.RescueCase;
 import com.deepblue.rescue.domain.RescueCenter;
+import com.deepblue.rescue.domain.RescueStatus;
 import com.deepblue.rescue.repository.AnimalRepository;
 import com.deepblue.rescue.repository.ExpertiseRepository;
 import com.deepblue.rescue.repository.MedicalRecordRepository;
@@ -18,6 +20,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,6 +89,30 @@ class PersistenceIntegrationTest {
 
         long total = rescueCenterRepository.count();
         assertThat(total).isEqualTo(1);
+    }
+
+    @Test
+    void shouldPersistOneToManyRelationBetweenCenterAndCases() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean Center", "Santa Marta");
+
+        RescueCase case1 = new RescueCase("RES-001", LocalDate.of(2026, 8, 1),
+                "Bahía Concha", RescueStatus.IN_REHABILITATION);
+        RescueCase case2 = new RescueCase("RES-002", LocalDate.of(2026, 8, 5),
+                "Playa Blanca", RescueStatus.ADMITTED);
+
+        center.addCase(case1);
+        center.addCase(case2);
+
+        rescueCenterRepository.save(center);
+        rescueCaseRepository.saveAll(List.of(case1, case2));
+        rescueCaseRepository.flush();
+
+        List<RescueCase> cases = rescueCaseRepository.findByRescueCenterCode("DB-CAR");
+
+        assertThat(cases).hasSize(2);
+        assertThat(cases)
+                .extracting(RescueCase::getCaseCode)
+                .containsExactlyInAnyOrder("RES-001", "RES-002");
     }
 
 }
