@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Container;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 @Testcontainers
 @SpringBootTest
@@ -345,6 +347,30 @@ class PersistenceIntegrationTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getDescription()).isEqualTo("Middle");
+    }
+
+    @Test
+    void shouldViolateUniqueConstraintOnAnimalCode() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean", "Santa Marta");
+        rescueCenterRepository.save(center);
+
+        RescueCase case1 = new RescueCase("RES-100-1", LocalDate.of(2026, 8, 1), "Bahía Concha", RescueStatus.ADMITTED);
+        center.addCase(case1);
+        Animal animal1 = new Animal("AN-100", "Green Sea Turtle", "Chelonia mydas", AnimalSex.FEMALE);
+        case1.assignAnimal(animal1);
+
+        rescueCaseRepository.save(case1);
+        rescueCaseRepository.flush();
+
+        RescueCase case2 = new RescueCase("RES-100-2", LocalDate.of(2026, 8, 2), "Playa Blanca", RescueStatus.ADMITTED);
+        center.addCase(case2);
+        Animal animal2 = new Animal("AN-100", "Loggerhead Turtle", "Caretta caretta", AnimalSex.MALE);
+        case2.assignAnimal(animal2);
+
+        assertThatThrownBy(() -> {
+            rescueCaseRepository.save(case2);
+            rescueCaseRepository.flush();
+        }).isInstanceOf(DataIntegrityViolationException.class);
     }
 
 }
