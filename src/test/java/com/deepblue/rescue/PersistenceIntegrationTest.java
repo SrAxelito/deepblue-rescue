@@ -470,4 +470,35 @@ class PersistenceIntegrationTest {
         )).hasSize(2);
     }
 
+    @Test
+    void shouldFindAnimalsInRehabilitationTreatedBySpecialistWithTraumaExpertise() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean", "Santa Marta");
+        RescueCase rescueCase = new RescueCase("RES-2026-200", LocalDate.of(2026, 8, 20),
+                "Bahía Concha", RescueStatus.IN_REHABILITATION);
+        center.addCase(rescueCase);
+
+        Animal animal = new Animal("AN-2026-200", "Green Sea Turtle", "Chelonia mydas", AnimalSex.FEMALE);
+        rescueCase.assignAnimal(animal);
+
+        Expertise trauma = expertiseRepository.findByNameIgnoreCase("Trauma").orElseThrow();
+        Specialist elena = new Specialist("SPEC-200", "Elena", "Vargas", "elena200@deepblue.org", true);
+        elena.addExpertise(trauma);
+
+        rescueCenterRepository.save(center);
+        rescueCaseRepository.save(rescueCase);
+        animalRepository.save(animal);
+        specialistRepository.save(elena);
+
+        Treatment treatment = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 20, 9, 0),
+                TreatmentType.WOUND_CARE, "Trauma treatment");
+        treatmentRepository.save(treatment);
+        treatmentRepository.flush();
+
+        List<Animal> result = animalRepository.findInRehabilitationTreatedBySpecialistWithExpertise(
+                RescueStatus.IN_REHABILITATION, "Trauma");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getAnimalCode()).isEqualTo("AN-2026-200");
+    }
+
 }
