@@ -1,4 +1,7 @@
-package domain;
+package com.deepblue.rescue.domain;
 
-public class AnimalSex {
+public enum AnimalSex {
+    MALE,
+    FEMALE,
+    UNKNOWN
 }
