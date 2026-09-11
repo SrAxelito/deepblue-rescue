@@ -20,6 +20,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -228,6 +229,122 @@ class PersistenceIntegrationTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getAnimalCode()).isEqualTo("AN-CAR-1");
+    }
+
+    @Test
+    void shouldFindActiveSpecialistsByExpertise() {
+        Expertise trauma = expertiseRepository.findByNameIgnoreCase("Trauma").orElseThrow();
+        Expertise rehabilitation = expertiseRepository.findByNameIgnoreCase("Rehabilitation").orElseThrow();
+        Expertise marineMammals = expertiseRepository.findByNameIgnoreCase("Marine Mammals").orElseThrow();
+        Expertise marineBirds = expertiseRepository.findByNameIgnoreCase("Marine Birds").orElseThrow();
+
+        Specialist elena = new Specialist("SPEC-001", "Elena", "Vargas", "elena@deepblue.org", true);
+        elena.addExpertise(trauma);
+        elena.addExpertise(rehabilitation);
+
+        Specialist mateo = new Specialist("SPEC-002", "Mateo", "Gomez", "mateo@deepblue.org", true);
+        mateo.addExpertise(marineMammals);
+        mateo.addExpertise(rehabilitation);
+
+        Specialist sofia = new Specialist("SPEC-003", "Sofia", "Restrepo", "sofia@deepblue.org", true);
+        sofia.addExpertise(marineBirds);
+        sofia.addExpertise(trauma);
+
+        specialistRepository.saveAll(List.of(elena, mateo, sofia));
+        specialistRepository.flush();
+
+        List<Specialist> result = specialistRepository.findActiveByExpertise("Trauma");
+
+        assertThat(result).extracting(Specialist::getLastName)
+                .containsExactlyInAnyOrder("Vargas", "Restrepo");
+    }
+
+    @Test
+    void shouldPersistTreatmentsForAnimal() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean", "Santa Marta");
+        RescueCase rescueCase = new RescueCase("RES-2026-010", LocalDate.of(2026, 8, 10), "Bahía Concha", RescueStatus.IN_REHABILITATION);
+        center.addCase(rescueCase);
+
+        Animal animal = new Animal("AN-2026-010", "Green Sea Turtle", "Chelonia mydas", AnimalSex.FEMALE);
+        rescueCase.assignAnimal(animal);
+
+        Specialist elena = new Specialist("SPEC-010", "Elena", "Vargas", "elena10@deepblue.org", true);
+        Specialist mateo = new Specialist("SPEC-011", "Mateo", "Gomez", "mateo11@deepblue.org", true);
+
+        rescueCenterRepository.save(center);
+        rescueCaseRepository.save(rescueCase);
+        animalRepository.save(animal);
+        specialistRepository.saveAll(List.of(elena, mateo));
+
+        Treatment t1 = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 10, 9, 0), TreatmentType.WOUND_CARE, "Wound cleaning");
+        Treatment t2 = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 10, 11, 0), TreatmentType.HYDRATION, "Fluid therapy");
+        Treatment t3 = new Treatment(animal, mateo, LocalDateTime.of(2026, 8, 10, 14, 0), TreatmentType.OBSERVATION, "General check");
+
+        treatmentRepository.saveAll(List.of(t1, t2, t3));
+        treatmentRepository.flush();
+
+        assertThat(treatmentRepository.count()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldFindTreatmentsByAnimalOrderedChronologically() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean", "Santa Marta");
+        RescueCase rescueCase = new RescueCase("RES-2026-020", LocalDate.of(2026, 8, 12), "Bahía Concha", RescueStatus.IN_REHABILITATION);
+        center.addCase(rescueCase);
+
+        Animal animal = new Animal("AN-2026-020", "Green Sea Turtle", "Chelonia mydas", AnimalSex.FEMALE);
+        rescueCase.assignAnimal(animal);
+
+        Specialist elena = new Specialist("SPEC-020", "Elena", "Vargas", "elena20@deepblue.org", true);
+
+        rescueCenterRepository.save(center);
+        rescueCaseRepository.save(rescueCase);
+        animalRepository.save(animal);
+        specialistRepository.save(elena);
+
+        Treatment t1 = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 12, 9, 0), TreatmentType.WOUND_CARE, "Treatment 1");
+        Treatment t2 = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 12, 11, 0), TreatmentType.HYDRATION, "Treatment 2");
+        Treatment t3 = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 12, 14, 0), TreatmentType.OBSERVATION, "Treatment 3");
+
+        treatmentRepository.saveAll(List.of(t3, t1, t2));
+        treatmentRepository.flush();
+
+        List<Treatment> result = treatmentRepository.findByAnimalIdOrderByPerformedAtAsc(animal.getId());
+
+        assertThat(result).extracting(Treatment::getDescription)
+                .containsExactly("Treatment 1", "Treatment 2", "Treatment 3");
+    }
+
+    @Test
+    void shouldFindTreatmentsBetweenDates() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean", "Santa Marta");
+        RescueCase rescueCase = new RescueCase("RES-2026-030", LocalDate.of(2026, 8, 1), "Bahía Concha", RescueStatus.IN_REHABILITATION);
+        center.addCase(rescueCase);
+
+        Animal animal = new Animal("AN-2026-030", "Green Sea Turtle", "Chelonia mydas", AnimalSex.FEMALE);
+        rescueCase.assignAnimal(animal);
+
+        Specialist elena = new Specialist("SPEC-030", "Elena", "Vargas", "elena30@deepblue.org", true);
+
+        rescueCenterRepository.save(center);
+        rescueCaseRepository.save(rescueCase);
+        animalRepository.save(animal);
+        specialistRepository.save(elena);
+
+        Treatment t1 = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 1, 10, 0), TreatmentType.WOUND_CARE, "Early");
+        Treatment t2 = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 10, 10, 0), TreatmentType.HYDRATION, "Middle");
+        Treatment t3 = new Treatment(animal, elena, LocalDateTime.of(2026, 8, 20, 10, 0), TreatmentType.OBSERVATION, "Late");
+
+        treatmentRepository.saveAll(List.of(t1, t2, t3));
+        treatmentRepository.flush();
+
+        List<Treatment> result = treatmentRepository.findBetweenDates(
+                LocalDateTime.of(2026, 8, 5, 0, 0),
+                LocalDateTime.of(2026, 8, 15, 0, 0)
+        );
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getDescription()).isEqualTo("Middle");
     }
 
 }
