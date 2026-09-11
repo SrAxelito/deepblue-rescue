@@ -1,4 +1,4 @@
-DeepBlue Rescue
+# DeepBlue Rescue
 
 Es la capa de persistencia de un sistema para centros que rescatan animales marinos. Cuando encuentran un animal herido, se registra el caso de rescate, el animal, su expediente médico, y los especialistas le hacen tratamientos hasta que se recupera. El proyecto solo cubre la parte de base de datos (entidades, repositories y migraciones), no tiene API ni frontend.
 
