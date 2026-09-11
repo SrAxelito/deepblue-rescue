@@ -1,5 +1,6 @@
 package com.deepblue.rescue;
 
+import com.deepblue.rescue.domain.RescueCenter;
 import com.deepblue.rescue.repository.AnimalRepository;
 import com.deepblue.rescue.repository.ExpertiseRepository;
 import com.deepblue.rescue.repository.MedicalRecordRepository;
@@ -66,6 +67,25 @@ class PersistenceIntegrationTest {
         );
 
         assertThat(versions).contains("1", "2");
+    }
+
+    @Test
+    void shouldPersistAndRetrieveRescueCenterUsingInheritedMethods() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean Center", "Santa Marta");
+
+        RescueCenter saved = rescueCenterRepository.save(center);
+
+        assertThat(saved.getId()).isNotNull();
+
+        boolean exists = rescueCenterRepository.existsById(saved.getId());
+        assertThat(exists).isTrue();
+
+        var found = rescueCenterRepository.findById(saved.getId());
+        assertThat(found).isPresent();
+        assertThat(found.get().getCode()).isEqualTo("DB-CAR");
+
+        long total = rescueCenterRepository.count();
+        assertThat(total).isEqualTo(1);
     }
 
 }
