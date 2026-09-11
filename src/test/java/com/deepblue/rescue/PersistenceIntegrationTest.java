@@ -1,8 +1,6 @@
 package com.deepblue.rescue;
 
-import com.deepblue.rescue.domain.RescueCase;
-import com.deepblue.rescue.domain.RescueCenter;
-import com.deepblue.rescue.domain.RescueStatus;
+import com.deepblue.rescue.domain.*;
 import com.deepblue.rescue.repository.AnimalRepository;
 import com.deepblue.rescue.repository.ExpertiseRepository;
 import com.deepblue.rescue.repository.MedicalRecordRepository;
@@ -20,6 +18,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -113,6 +112,73 @@ class PersistenceIntegrationTest {
         assertThat(cases)
                 .extracting(RescueCase::getCaseCode)
                 .containsExactlyInAnyOrder("RES-001", "RES-002");
+    }
+    @Test
+    void shouldPersistOneToOneRelationBetweenCaseAndAnimal() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean Center", "Santa Marta");
+
+        RescueCase rescueCase = new RescueCase("RES-2026-001", LocalDate.of(2026, 8, 18),
+                "Bahía Concha", RescueStatus.IN_REHABILITATION);
+
+        center.addCase(rescueCase);
+
+        Animal animal = new Animal("AN-2026-001", "Green Sea Turtle", "Chelonia mydas", AnimalSex.FEMALE);
+
+        rescueCase.assignAnimal(animal);
+
+        rescueCenterRepository.save(center);
+        rescueCaseRepository.save(rescueCase);
+        animalRepository.save(animal);
+        animalRepository.flush();
+
+        RescueCase foundCase = rescueCaseRepository.findByCaseCode("RES-2026-001").orElseThrow();
+        Animal foundAnimal = animalRepository.findByAnimalCode("AN-2026-001").orElseThrow();
+
+        assertThat(foundCase.getAnimal().getAnimalCode()).isEqualTo("AN-2026-001");
+        assertThat(foundAnimal.getRescueCase().getCaseCode()).isEqualTo("RES-2026-001");
+    }
+
+    @Test
+    void shouldPersistOneToOneRelationBetweenAnimalAndMedicalRecord() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean Center", "Santa Marta");
+        RescueCase rescueCase = new RescueCase("RES-2026-002", LocalDate.of(2026, 8, 19),
+                "Bahía Concha", RescueStatus.ADMITTED);
+        center.addCase(rescueCase);
+
+        Animal animal = new Animal("AN-2026-002", "Loggerhead Turtle", "Caretta caretta", AnimalSex.MALE);
+        rescueCase.assignAnimal(animal);
+
+        MedicalRecord record = new MedicalRecord(
+                new BigDecimal("28.40"),
+                "STABLE",
+                "Left front flipper injury",
+                null
+        );
+        animal.assignMedicalRecord(record);
+
+        rescueCenterRepository.save(center);
+        rescueCaseRepository.save(rescueCase);
+        animalRepository.save(animal);
+        animalRepository.flush();
+
+        assertThat(animal.getId()).isNotNull();
+        assertThat(record.getId()).isNotNull();
+    }
+
+    @Test
+    void shouldPersistManyToManyRelationBetweenSpecialistAndExpertise() {
+        Expertise trauma = expertiseRepository.findByNameIgnoreCase("Trauma").orElseThrow();
+        Expertise rehabilitation = expertiseRepository.findByNameIgnoreCase("Rehabilitation").orElseThrow();
+
+        Specialist elena = new Specialist("SPEC-001", "Elena", "Vargas", "elena@deepblue.org", true);
+        elena.addExpertise(trauma);
+        elena.addExpertise(rehabilitation);
+
+        specialistRepository.save(elena);
+        specialistRepository.flush();
+
+        Specialist found = specialistRepository.findById(elena.getId()).orElseThrow();
+        assertThat(found.getExpertiseAreas()).hasSize(2);
     }
 
 }
