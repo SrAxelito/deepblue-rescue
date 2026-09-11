@@ -1,12 +1,8 @@
-# 1. Nombre del proyecto
-
 DeepBlue Rescue
-
-# 2. Descripción breve
 
 Es la capa de persistencia de un sistema para centros que rescatan animales marinos. Cuando encuentran un animal herido, se registra el caso de rescate, el animal, su expediente médico, y los especialistas le hacen tratamientos hasta que se recupera. El proyecto solo cubre la parte de base de datos (entidades, repositories y migraciones), no tiene API ni frontend.
 
-# 3. Modelo de datos
+# Modelo de datos
 
 Las tablas/entidades son:
 
@@ -19,7 +15,7 @@ Las tablas/entidades son:
 - `Treatment` - los tratamientos hechos al animal
 - `specialist_expertise` - tabla intermedia (no es una entidad de negocio, solo conecta Specialist con Expertise)
 
-# 4. Relaciones
+# Relaciones
 
 - `RescueCenter` → `RescueCase`: 1:N (un centro tiene muchos casos)
 - `RescueCase` → `Animal`: 1:1 (un caso tiene un solo animal)
@@ -28,7 +24,7 @@ Las tablas/entidades son:
 - `Animal` → `Treatment`: 1:N (un animal puede recibir muchos tratamientos)
 - `Specialist` → `Treatment`: 1:N (un especialista puede hacer muchos tratamientos)
 
-# 5. Instrucciones para ejecutar
+# Instrucciones para ejecutar
 
 Necesitas tener Docker Desktop abierto antes de compilar, porque los tests lo necesitan para levantar PostgreSQL.
 
@@ -44,7 +40,7 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 ```
 
-# 6. Instrucciones para ejecutar tests
+# Instrucciones para ejecutar tests
 
 Docker Desktop tiene que estar corriendo, porque los tests usan Testcontainers para levantar un PostgreSQL real.
 
@@ -52,7 +48,7 @@ Docker Desktop tiene que estar corriendo, porque los tests usan Testcontainers p
 mvn test
 ```
 
-# 7. Explicación de Flyway
+# Explicación de Flyway
 
 Las tablas las crea Flyway, no Hibernate. En el `application.yml` está configurado:
 
@@ -68,11 +64,11 @@ Las migraciones están en `src/main/resources/db/migration`:
 - `V2__insert_expertise_catalog.sql` - inserta el catálogo inicial de expertise
 - `V3__add_tracking_device_to_animal.sql` - agrega la columna del código del dispositivo GPS a `animals`
 
-# 8. Explicación de Testcontainers
+# Explicación de Testcontainers
 
 En vez de usar una base de datos falsa en memoria (como H2), los tests levantan un contenedor real de PostgreSQL usando Docker, automáticamente, cada vez que se corren. Esto se hace con las anotaciones `@Testcontainers`, `@Container` y `@ServiceConnection` en la clase de test. Así uno se asegura de que las constraints (UNIQUE, FOREIGN KEY, CHECK) se están probando contra una base de datos real y no contra una simulación que a veces no se comporta igual.
 
-# 9. Listado de Query Methods implementados
+# Listado de Query Methods implementados
 
 - `RescueCenterRepository.findByCode(String code)`
 - `RescueCaseRepository.findByCaseCode(String caseCode)`
@@ -86,7 +82,7 @@ En vez de usar una base de datos falsa en memoria (como H2), los tests levantan 
 - `ExpertiseRepository.findByNameIgnoreCase(String name)`
 - `TreatmentRepository.findByAnimalIdOrderByPerformedAtAsc(Long animalId)`
 
-# 10. Listado de consultas JPQL implementadas
+# Listado de consultas JPQL implementadas
 
 - `SpecialistRepository.findActiveByExpertise(String expertiseName)` - especialistas activos con determinada expertise
 - `TreatmentRepository.findBetweenDates(LocalDateTime start, LocalDateTime end)` - tratamientos entre dos fechas
