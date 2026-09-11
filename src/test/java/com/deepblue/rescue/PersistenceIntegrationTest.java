@@ -181,4 +181,53 @@ class PersistenceIntegrationTest {
         assertThat(found.getExpertiseAreas()).hasSize(2);
     }
 
+    @Test
+    void shouldFindRescueCasesByStatus() {
+        RescueCenter center = new RescueCenter("DB-CAR", "DeepBlue Caribbean Center", "Santa Marta");
+
+        RescueCase case1 = new RescueCase("RES-001", LocalDate.of(2026, 8, 1), "Bahía Concha", RescueStatus.IN_REHABILITATION);
+        RescueCase case2 = new RescueCase("RES-002", LocalDate.of(2026, 8, 2), "Playa Blanca", RescueStatus.READY_FOR_RELEASE);
+        RescueCase case3 = new RescueCase("RES-003", LocalDate.of(2026, 8, 3), "Taganga", RescueStatus.IN_REHABILITATION);
+
+        center.addCase(case1);
+        center.addCase(case2);
+        center.addCase(case3);
+
+        rescueCenterRepository.save(center);
+        rescueCaseRepository.saveAll(List.of(case1, case2, case3));
+        rescueCaseRepository.flush();
+
+        List<RescueCase> result = rescueCaseRepository.findByStatusOrderByRescueDateAsc(RescueStatus.IN_REHABILITATION);
+
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    void shouldFindAnimalsByCenterCodeOnly() {
+        RescueCenter centerCar = new RescueCenter("DB-CAR", "DeepBlue Caribbean", "Santa Marta");
+        RescueCenter centerPac = new RescueCenter("DB-PAC", "DeepBlue Pacific", "Buenaventura");
+
+        RescueCase caseCar = new RescueCase("RES-CAR-1", LocalDate.of(2026, 8, 1), "Bahía Concha", RescueStatus.ADMITTED);
+        RescueCase casePac = new RescueCase("RES-PAC-1", LocalDate.of(2026, 8, 1), "Isla Gorgona", RescueStatus.ADMITTED);
+
+        centerCar.addCase(caseCar);
+        centerPac.addCase(casePac);
+
+        Animal animalCar = new Animal("AN-CAR-1", "Green Sea Turtle", "Chelonia mydas", AnimalSex.FEMALE);
+        Animal animalPac = new Animal("AN-PAC-1", "Olive Ridley Turtle", "Lepidochelys olivacea", AnimalSex.MALE);
+
+        caseCar.assignAnimal(animalCar);
+        casePac.assignAnimal(animalPac);
+
+        rescueCenterRepository.saveAll(List.of(centerCar, centerPac));
+        rescueCaseRepository.saveAll(List.of(caseCar, casePac));
+        animalRepository.saveAll(List.of(animalCar, animalPac));
+        animalRepository.flush();
+
+        List<Animal> result = animalRepository.findByRescueCaseRescueCenterCode("DB-CAR");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getAnimalCode()).isEqualTo("AN-CAR-1");
+    }
+
 }
