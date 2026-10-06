@@ -2,12 +2,13 @@
 
 Sistema para centros que rescatan y rehabilitan animales marinos. Cuando encuentran un animal herido, se registra el caso de rescate, el animal, su expediente médico, y los especialistas le hacen tratamientos hasta que se recupera.
 
-El proyecto ahora cubre dos capas:
+El proyecto ahora cubre tres capas:
 
 - **Persistencia**: entidades, repositories y migraciones (laboratorio 1).
 - **Servicio**: reglas de negocio, DTOs, mappers y excepciones (laboratorio 2).
+- **Controlador**: API REST, validación de entrada y contrato de errores (laboratorio 3).
 
-Todavía no tiene Controllers, API REST, Spring Security ni frontend — eso queda para laboratorios posteriores.
+Todavía no tiene Spring Security ni frontend — eso queda para laboratorios posteriores.
 
 # Modelo de datos
 
@@ -34,7 +35,9 @@ Las tablas/entidades son:
 # Arquitectura
 
 ```
-Controller (futuro)
+ Cliente HTTP
+      ↓
+  Controller
       ↓
    Service
       ↓
@@ -52,6 +55,13 @@ La capa Service es responsable de:
 - controlar transacciones (`@Transactional`);
 - lanzar excepciones específicas (`ResourceNotFoundException`, `BusinessRuleException`) en vez de dejar que el Controller o el Repository asuman esa responsabilidad.
 
+La capa Controller es responsable de:
+
+- recibir la petición HTTP (URL, método, path variables, query parameters y body);
+- validar la **forma** de la entrada con Bean Validation (`@Valid`);
+- delegar en el Service — nunca usa un Repository directamente ni decide reglas de negocio;
+- responder con el código HTTP correcto (`200`, `201`, `400`, `404`, `409`, `500`) y un Response DTO, nunca una entidad.
+
 # Instrucciones para ejecutar
 
 ```bash
@@ -68,7 +78,15 @@ DB_PASSWORD=postgres
 
 # Instrucciones para ejecutar tests
 
-Hay dos tipos de tests en el proyecto, y solo uno de ellos necesita Docker:
+Hay tres tipos de tests en el proyecto, y solo uno de ellos necesita Docker:
+
+**Tests de la capa Controller** (`@WebMvcTest` + MockMvc, con el Service mockeado):
+
+```bash
+mvn test -Dtest=RescueCaseControllerTest,TreatmentControllerTest,AnimalControllerTest
+```
+
+Estos NO necesitan Docker ni PostgreSQL. Solo se levanta la capa web; los services se reemplazan con `@MockitoBean`.
 
 **Unit tests de la capa Service** (Mockito, sin base de datos real):
 
@@ -117,6 +135,9 @@ Se usan `record` de Java para evitar exponer las entidades directamente hacia ot
 - `TreatmentResponse`
 - `AnimalResponse`
 
+- `TreatmentEligibilityResponse`
+- `ErrorResponse`
+
 **Request:**
 - `ChangeRescueStatusRequest`
 - `CreateTreatmentRequest`
@@ -163,6 +184,63 @@ Cualquier transición fuera de esa secuencia lanza `BusinessRuleException` y nun
 - `findByCode(animalCode)` - búsqueda por código.
 - `findAnimalsInRehabilitation()` - animales cuyo caso está `IN_REHABILITATION`.
 - `canReceiveTreatment(animalCode)` - retorna `true` solo si el caso del animal está `UNDER_EVALUATION` o `IN_REHABILITATION`.
+
+# API REST (capa Controller)
+
+Cada método de la capa Service queda expuesto en un endpoint (8 métodos → 8 operaciones HTTP):
+
+| Método | Endpoint | Service | Éxito |
+|---|---|---|---|
+| GET | `/api/rescue-cases/{caseCode}` | `RescueCaseService.findByCode()` | 200 |
+| GET | `/api/rescue-cases?status=...` | `RescueCaseService.findByStatus()` | 200 |
+| PATCH | `/api/rescue-cases/{caseCode}/status` | `RescueCaseService.changeStatus()` | 200 |
+| POST | `/api/treatments` | `TreatmentService.register()` | 201 |
+| GET | `/api/animals/{animalCode}` | `AnimalService.findByCode()` | 200 |
+| GET | `/api/animals/in-rehabilitation` | `AnimalService.findAnimalsInRehabilitation()` | 200 |
+| GET | `/api/animals/{animalCode}/treatments` | `TreatmentService.findByAnimalCode()` | 200 |
+| GET | `/api/animals/{animalCode}/treatment-eligibility` | `AnimalService.canReceiveTreatment()` | 200 |
+
+Los controllers son `RescueCaseController`, `TreatmentController` y `AnimalController`.
+
+## Validación de entrada vs regla de negocio
+
+- **Validación de entrada** (DTO + Bean Validation, responde `400`): `animalCode` o `specialistCode` vacíos, `status` nulo, fecha del tratamiento en el futuro, `description` fuera de 10–500 caracteres.
+- **Regla de negocio** (Service, responde `404` o `409`): animal inexistente, especialista inactivo, caso `RELEASED`/`CLOSED`, transición de estado inválida, tratamiento anterior al rescate.
+
+## Contrato de errores
+
+Todos los errores salen con la misma estructura (`ErrorResponse`), armada en `GlobalExceptionHandler` (`@RestControllerAdvice`):
+
+```json
+{
+  "timestamp": "2026-10-04T19:01:00",
+  "status": 404,
+  "error": "Not Found",
+  "message": "Animal not found: AN-999",
+  "details": {}
+}
+```
+
+| Situación | HTTP | Excepción manejada |
+|---|---|---|
+| DTO inválido | 400 | `MethodArgumentNotValidException` |
+| JSON mal formado o enum inexistente | 400 | `HttpMessageNotReadableException` |
+| Query parameter inválido | 400 | `MethodArgumentTypeMismatchException` |
+| Recurso inexistente | 404 | `ResourceNotFoundException` |
+| Regla de negocio | 409 | `BusinessRuleException` |
+| Error inesperado | 500 | `Exception` |
+
+En los errores de validación, `details` trae un mensaje por cada campo inválido. En el `500` nunca se expone el stack trace ni detalles internos.
+
+# Tests de la capa Controller
+
+Se prueban con `@WebMvcTest`, `@MockitoBean` y `MockMvc`: el controller es real y el service es un mock, así que se verifica el contrato HTTP (URL, método, JSON, validación, código de estado y delegación al service), no las reglas de negocio.
+
+- `RescueCaseControllerTest` - caso existente (200), caso inexistente (404), búsqueda por status (200), status inválido en la URL (400), cambio de estado (200), request sin status (400), transición inválida (409), enum inválido en el JSON (400) y error inesperado (500).
+- `TreatmentControllerTest` - registro válido (201), request inválido (400 con `details`), animal inexistente (404) y regla de negocio violada (409).
+- `AnimalControllerTest` - animal por código (200), animal inexistente (404), animales en rehabilitación (200), tratamientos del animal (200), elegibilidad (200) y elegibilidad de un animal inexistente (404).
+
+Cuando la validación falla se comprueba con `verify(service, never())` que el request nunca llegó al service.
 
 # Unit tests de la capa Service
 
