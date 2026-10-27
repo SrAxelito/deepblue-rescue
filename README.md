@@ -2,13 +2,42 @@
 
 Sistema para centros que rescatan y rehabilitan animales marinos. Cuando encuentran un animal herido, se registra el caso de rescate, el animal, su expediente médico, y los especialistas le hacen tratamientos hasta que se recupera.
 
-El proyecto ahora cubre tres capas:
+El proyecto ahora cubre tres capas de backend y un frontend:
 
 - **Persistencia**: entidades, repositories y migraciones (laboratorio 1).
 - **Servicio**: reglas de negocio, DTOs, mappers y excepciones (laboratorio 2).
 - **Controlador**: API REST, validación de entrada y contrato de errores (laboratorio 3).
+- **Frontend**: panel en React + TanStack Query que consume el API REST (laboratorio 4, carpeta `deepblue-ui/`).
 
-Todavía no tiene Spring Security ni frontend — eso queda para laboratorios posteriores.
+Todavía no tiene Spring Security.
+
+# Frontend (`deepblue-ui/`)
+
+Hecho con React, Vite y TanStack Query v5. Vite tiene un proxy que reenvía `/api` a `http://localhost:8080`, así que el backend no necesita configurar CORS.
+
+```text
+Componente → Hook personalizado → useQuery / useMutation → api/*.js → fetch → proxy Vite → Spring Boot
+```
+
+- `src/api/`: funciones HTTP puras. `request()` convierte el `ErrorResponse` del backend en un `ApiError` (con `status`, `message` y `details`) y lo lanza, para que TanStack Query marque la consulta como `isError`.
+- `src/hooks/`: `useRescueCases(status)`, `useAnimal(animalCode)` (con `enabled`) y `useRegisterTreatment()`.
+- `src/components/`: lista de casos filtrada por estado, detalle del caso con su animal, elegibilidad y tratamientos, cambio de estado (`useMutation` e invalidación de `['rescue-cases']`) y formulario de tratamiento con `useReducer` (invalida `['animal', animalCode]`).
+
+Para ejecutarlo (con el backend arriba en el puerto 8080):
+
+```bash
+cd deepblue-ui
+npm install
+npm run dev
+```
+
+Y abrir `http://localhost:5173`.
+
+Si la base está vacía, `deepblue-ui/seed-data.sql` inserta centros, casos en varios estados, animales, especialistas (uno inactivo, `SP-003`) y tratamientos. No es una migración de Flyway: se ejecuta a mano después de arrancar el backend una vez:
+
+```bash
+psql -U postgres -d deepblue -f deepblue-ui/seed-data.sql
+```
 
 # Modelo de datos
 
@@ -173,11 +202,11 @@ Cualquier transición fuera de esa secuencia lanza `BusinessRuleException` y nun
 
 - `findByAnimalCode(animalCode)` - tratamientos de un animal ordenados cronológicamente.
 - `register(request)` - registra un tratamiento validando, en orden:
-    1. el animal existe (`ResourceNotFoundException`);
-    2. el especialista existe (`ResourceNotFoundException`);
-    3. el especialista está activo (`BusinessRuleException`);
-    4. el caso del animal no está `RELEASED` ni `CLOSED` (`BusinessRuleException`);
-    5. la fecha del tratamiento no es anterior a la fecha de rescate (`BusinessRuleException`).
+  1. el animal existe (`ResourceNotFoundException`);
+  2. el especialista existe (`ResourceNotFoundException`);
+  3. el especialista está activo (`BusinessRuleException`);
+  4. el caso del animal no está `RELEASED` ni `CLOSED` (`BusinessRuleException`);
+  5. la fecha del tratamiento no es anterior a la fecha de rescate (`BusinessRuleException`).
 
 ## AnimalService (reto integrador)
 
