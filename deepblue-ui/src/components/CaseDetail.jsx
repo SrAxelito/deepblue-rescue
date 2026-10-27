@@ -1,4 +1,5 @@
 import { useAnimal } from '../hooks/useAnimal'
+import ChangeStatus from './ChangeStatus'
 import ErrorMessage from './ErrorMessage'
 import TreatmentList from './TreatmentList'
 
@@ -16,6 +17,12 @@ export default function CaseDetail({ caseItem, onChanged }) {
                     <strong>Fecha:</strong> {caseItem.rescueDate}
                 </p>
             </section>
+
+            <ChangeStatus
+                key={caseItem.caseCode}
+                caseItem={caseItem}
+                onChanged={onChanged}
+            />
 
             <section>
                 <h3>Animal {caseItem.animalCode}</h3>
