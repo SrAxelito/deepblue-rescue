@@ -1,6 +1,7 @@
 import { useAnimal } from '../hooks/useAnimal'
 import ChangeStatus from './ChangeStatus'
 import ErrorMessage from './ErrorMessage'
+import TreatmentForm from './TreatmentForm'
 import TreatmentList from './TreatmentList'
 
 export default function CaseDetail({ caseItem, onChanged }) {
@@ -51,6 +52,8 @@ export default function CaseDetail({ caseItem, onChanged }) {
             </section>
 
             <TreatmentList query={treatments} />
+
+            <TreatmentForm key={caseItem.animalCode} animalCode={caseItem.animalCode} />
         </div>
     )
 }
